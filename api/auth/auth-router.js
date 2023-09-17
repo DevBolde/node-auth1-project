@@ -2,7 +2,8 @@
 // middleware functions from `auth-middleware.js`. You will need them here!
 const router = require('express').Router()
 const { checkPasswordLength, checkUsernameExists, checkUsernameFree } = require('./auth-middleware')
-
+const User = require('../users/users-model')
+const bcrypt = require('bcryptjs')
 /**
   1 [POST] /api/auth/register { "username": "sue", "password": "1234" }
 
@@ -25,10 +26,16 @@ const { checkPasswordLength, checkUsernameExists, checkUsernameFree } = require(
     "message": "Password must be longer than 3 chars"
   }
  */
-router.post('/register', (req, res, next) => {
-  res.json('register')
-  next()
-})
+router.post('/register', checkPasswordLength, checkUsernameFree, (req, res, next) => {
+  const { username, password } = req.body
+  const hash = bcrypt.hashSync(password, 8)
+
+    User.add({ username, password: hash })
+    .then(saved => {
+      res.status(201).json(saved)
+    })
+    .catch(next)
+  })
 
 
 /**
@@ -46,8 +53,16 @@ router.post('/register', (req, res, next) => {
     "message": "Invalid credentials"
   }
  */
-  router.post('/login', (req, res, next) => {
-    res.json('login')
+  router.post('/login', checkUsernameExists, (req, res, next) => {
+    const { password } = req.body;
+    if(bcrypt.compareSync(password, req.user.password)){
+      //Make it so the cookie is set on the client
+      // make it so the server stores a session with a session id
+      req.session.user = req.user
+      res.json({ message: `Welcome ${req.user.username}`})
+    }else{
+      next({status: 401, message: 'Invalid credentials'})
+    }
   })
 
 /**
